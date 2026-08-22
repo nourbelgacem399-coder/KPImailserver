@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>KPI Mail Server - VIP02</title>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <style>
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+            background: #f4f6f8;
+        }
+
+        header {
+            background: #1f4e79;
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
+
+        .container {
+            padding: 30px;
+        }
+
+        .filters {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 25px;
+        }
+
+        input, button {
+            padding: 10px;
+            margin-right: 10px;
+        }
+
+        button {
+            background: #1f4e79;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+        .cards {
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+
+        .card {
+            background: white;
+            padding: 25px;
+            border-radius: 10px;
+            flex: 1;
+            min-width: 200px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+
+        .card h2 {
+            color: #555;
+        }
+
+        .value {
+            font-size: 32px;
+            font-weight: bold;
+            color: #1f4e79;
+        }
+
+        .chart-container {
+            margin-top: 30px;
+            background: white;
+            padding: 25px;
+            border-radius: 10px;
+        }
+    </style>
+</head>
+
+<body>
+
+<header>
+    <h1>KPI MAIL SERVER - VIP02</h1>
+    <p>Monitoring Dashboard</p>
+</header>
+
+<div class="container">
+
+    <div class="filters">
+        <label>Date :</label>
+
+        <input type="date" id="date" value="2026-08-02">
+
+        <button onclick="loadKPI()">
+            Afficher
+        </button>
+    </div>
+
+    <div class="cards">
+
+        <div class="card">
+            <h2>Mail Relayed</h2>
+            <div class="value" id="mailRelayed">0</div>
+        </div>
+
+        <div class="card">
+            <h2>Spam</h2>
+            <div class="value" id="spam">0</div>
+        </div>
+
+        <div class="card">
+            <h2>Virus</h2>
+            <div class="value" id="virus">0</div>
+        </div>
+
+    </div>
+
+    <div class="chart-container">
+        <h2>Évolution des KPI</h2>
+
+        <canvas id="kpiChart"></canvas>
+    </div>
+
+</div>
+
+<script>
+
+let chart;
+
+async function loadKPI() {
+
+    const date =
+        document.getElementById("date").value;
+
+    try {
+
+        const response =
+            await fetch(
+                `/api/kpi/date?date=${date}`
+            );
+
+        const data =
+            await response.json();
+
+        console.log(data);
+
+        if (data.length === 0) {
+
+            document.getElementById("mailRelayed").textContent = "0";
+            document.getElementById("spam").textContent = "0";
+            document.getElementById("virus").textContent = "0";
+
+            return;
+        }
+
+        let totalMail = 0;
+        let totalSpam = 0;
+        let totalVirus = 0;
+
+        const hours = [];
+        const mailValues = [];
+        const spamValues = [];
+        const virusValues = [];
+
+        data.forEach(kpi => {
+
+            totalMail += kpi.mailRelayed;
+            totalSpam += kpi.spam;
+            totalVirus += kpi.virus;
+
+            hours.push(kpi.hour);
+            mailValues.push(kpi.mailRelayed);
+            spamValues.push(kpi.spam);
+            virusValues.push(kpi.virus);
+        });
+
+        document.getElementById("mailRelayed").textContent =
+            totalMail;
+
+        document.getElementById("spam").textContent =
+            totalSpam;
+
+        document.getElementById("virus").textContent =
+            totalVirus;
+
+        if (chart) {
+            chart.destroy();
+        }
+
+        const ctx =
+            document.getElementById("kpiChart");
+
+        chart = new Chart(ctx, {
+
+            type: "line",
+
+            data: {
+
+                labels: hours,
+
+                datasets: [
+
+                    {
+                        label: "Mail Relayed",
+                        data: mailValues,
+                        borderWidth: 2,
+                        tension: 0.3
+                    },
+
+                    {
+                        label: "Spam",
+                        data: spamValues,
+                        borderWidth: 2,
+                        tension: 0.3
+                    },
+
+                    {
+                        label: "Virus",
+                        data: virusValues,
+                        borderWidth: 2,
+                        tension: 0.3
+                    }
+
+                ]
+
+            },
+
+            options: {
+
+                responsive: true,
+
+                scales: {
+
+                    y: {
+                        beginAtZero: true
+                    }
+
+                }
+
+            }
+
+        });
+
+    } catch (error) {
+
+        console.error(
+            "Erreur:",
+            error
+        );
+
+    }
+}
+
+loadKPI();
+
+</script>
+
+</body>
+</html>   

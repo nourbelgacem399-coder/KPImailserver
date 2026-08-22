@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>KPI Mail Server VIP02</title>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            background: #f4f6f8;
+        }
+
+        header {
+            background: #1f2937;
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
+
+        .container {
+            width: 90%;
+            margin: 30px auto;
+        }
+
+        .filters {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 25px;
+        }
+
+        input, button {
+            padding: 10px;
+            margin: 5px;
+        }
+
+        button {
+            background: #2563eb;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background: #1d4ed8;
+        }
+
+        .chart-container {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+        }
+
+        #message {
+            margin-top: 10px;
+            font-weight: bold;
+        }
+    </style>
+</head>
+
+<body>
+
+<header>
+    <h1>KPI MAIL SERVER - VIP02</h1>
+</header>
+
+<div class="container">
+
+    <div class="filters">
+
+        <label>Date :</label>
+
+        <input
+                type="date"
+                id="date"
+                value="2026-08-02"
+        >
+
+        <label>Heure début :</label>
+
+        <input
+                type="number"
+                id="startHour"
+                min="0"
+                max="23"
+                value="0"
+        >
+
+        <label>Heure fin :</label>
+
+        <input
+                type="number"
+                id="endHour"
+                min="0"
+                max="23"
+                value="23"
+        >
+
+        <button onclick="loadKPI()">
+            Afficher
+        </button>
+
+        <div id="message"></div>
+
+    </div>
+
+    <div class="chart-container">
+
+        <canvas id="kpiChart"></canvas>
+
+    </div>
+
+</div>
+
+<script>
+
+    let chart = null;
+
+    async function loadKPI() {
+
+        const date =
+            document.getElementById("date").value;
+
+        const startHour =
+            document.getElementById("startHour").value;
+
+        const endHour =
+            document.getElementById("endHour").value;
+
+        const message =
+            document.getElementById("message");
+
+        message.innerText = "Chargement...";
+
+        try {
+
+            const response =
+                await fetch(
+                    `/api/kpi/hours?date=${date}&startHour=${startHour}&endHour=${endHour}`
+                );
+
+            if (!response.ok) {
+
+                throw new Error(
+                    "Erreur HTTP : " + response.status
+                );
+            }
+
+            const data =
+                await response.json();
+
+            if (data.length === 0) {
+
+                message.innerText =
+                    "Aucune donnée trouvée.";
+
+                if (chart) {
+                    chart.destroy();
+                }
+
+                return;
+            }
+
+            message.innerText =
+                data.length + " KPI trouvés.";
+
+            const labels =
+                data.map(kpi => kpi.hour);
+
+            const relay =
+                data.map(kpi => kpi.mailRelayed);
+
+            const spam =
+                data.map(kpi => kpi.spam);
+
+            const virus =
+                data.map(kpi => kpi.virus);
+
+            if (chart) {
+                chart.destroy();
+            }
+
+            const ctx =
+                document
+                    .getElementById("kpiChart")
+                    .getContext("2d");
+
+            chart =
+                new Chart(ctx, {
+
+                    type: "bar",
+
+                    data: {
+
+                        labels: labels,
+
+                        datasets: [
+
+                            {
+                                label: "Mail Relayed",
+                                data: relay,
+                                backgroundColor:
+                                    "rgba(54, 162, 235, 0.7)"
+                            },
+
+                            {
+                                label: "Spam",
+                                data: spam,
+                                type: "line",
+                                borderColor:
+                                    "red",
+                                tension: 0.3
+                            },
+
+                            {
+                                label: "Virus",
+                                data: virus,
+                                type: "line",
+                                borderColor:
+                                    "green",
+                                tension: 0.3
+                            }
+
+                        ]
+                    },
+
+                    options: {
+
+                        responsive: true,
+
+                        scales: {
+
+                            y: {
+                                beginAtZero: true
+                            }
+
+                        }
+
+                    }
+
+                });
+
+        } catch (error) {
+
+            console.error(error);
+
+            message.innerText =
+                "Erreur : impossible de récupérer les données.";
+
+        }
+    }
+
+</script>
+
+</body>
+</html>
