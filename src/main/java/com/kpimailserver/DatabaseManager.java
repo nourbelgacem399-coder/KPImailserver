@@ -13,7 +13,14 @@ public class DatabaseManager {
             System.getenv("DATABASE_URL");
 
     private static final boolean IS_POSTGRES =
-            DATABASE_URL != null && !DATABASE_URL.isBlank();
+        DATABASE_URL != null && !DATABASE_URL.isBlank();
+
+static {
+    System.out.println(
+            "DATABASE MODE = " +
+            (IS_POSTGRES ? "POSTGRESQL" : "MYSQL")
+    );
+}
 
     private static final String MYSQL_URL =
             "jdbc:mysql://localhost:3306/kpi_mail";
