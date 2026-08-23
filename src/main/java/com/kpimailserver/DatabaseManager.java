@@ -1,6 +1,6 @@
+
 package com.kpimailserver;
 
-import java.net.URI;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
@@ -32,56 +32,50 @@ public class DatabaseManager {
 
             if (IS_POSTGRES) {
 
-                URI uri = URI.create(DATABASE_URL);
+                String databaseUrl = DATABASE_URL.trim();
 
-                String host = uri.getHost();
-                int port = uri.getPort();
-
-                if (port == -1) {
-                    port = 5432;
+                if (databaseUrl.startsWith("postgresql://")) {
+                    databaseUrl =
+                            databaseUrl.substring(
+                                    "postgresql://".length()
+                            );
                 }
 
-                String database =
-                        uri.getPath().substring(1);
+                int atIndex =
+                        databaseUrl.indexOf('@');
 
-                String userInfo = uri.getUserInfo();
+                int colonIndex =
+                        databaseUrl.indexOf(':');
 
-                String username;
-                String password;
-
-                if (userInfo != null && userInfo.contains(":")) {
-
-                    int separator = userInfo.indexOf(':');
-
-                    username =
-                            userInfo.substring(0, separator);
-
-                    password =
-                            userInfo.substring(separator + 1);
-
-                } else {
+                if (atIndex == -1 ||
+                        colonIndex == -1 ||
+                        colonIndex > atIndex) {
 
                     throw new SQLException(
-                            "Utilisateur PostgreSQL introuvable"
+                            "DATABASE_URL PostgreSQL invalide"
                     );
                 }
 
-                String jdbcUrl =
-                        "jdbc:postgresql://"
-                                + host
-                                + ":"
-                                + port
-                                + "/"
-                                + database;
+                String username =
+                        databaseUrl.substring(
+                                0,
+                                colonIndex
+                        );
 
-                System.out.println(
-                        "Connexion PostgreSQL vers : "
-                                + host
-                                + ":"
-                                + port
-                                + "/"
-                                + database
-                );
+                String password =
+                        databaseUrl.substring(
+                                colonIndex + 1,
+                                atIndex
+                        );
+
+                String hostAndDatabase =
+                        databaseUrl.substring(
+                                atIndex + 1
+                        );
+
+                String jdbcUrl =
+                        "jdbc:postgresql://" +
+                                hostAndDatabase;
 
                 Properties properties =
                         new Properties();
@@ -105,28 +99,20 @@ public class DatabaseManager {
                         jdbcUrl,
                         properties
                 );
-
-            } else {
-
-                System.out.println(
-                        "Connexion MySQL locale"
-                );
-
-                return DriverManager.getConnection(
-                        MYSQL_URL,
-                        MYSQL_USER,
-                        MYSQL_PASSWORD
-                );
             }
 
-        } catch (Exception e) {
-
-            System.out.println(
-                    "Erreur connexion DB : "
-                            + e.getMessage()
+            return DriverManager.getConnection(
+                    MYSQL_URL,
+                    MYSQL_USER,
+                    MYSQL_PASSWORD
             );
 
-            e.printStackTrace();
+        } catch (SQLException e) {
+
+            System.out.println(
+                    "Erreur connexion DB : " +
+                            e.getMessage()
+            );
 
             return null;
         }
@@ -160,51 +146,56 @@ public class DatabaseManager {
                             "virus = VALUES(virus)";
         }
 
+        Connection connection =
+                getConnection();
+
+        if (connection == null) {
+            return;
+        }
+
         try (
-                Connection connection = getConnection()
+                connection;
+                PreparedStatement statement =
+                        connection.prepareStatement(sql)
         ) {
 
-            if (connection == null) {
-                return;
-            }
+            statement.setString(
+                    1,
+                    kpi.getDate()
+            );
 
-            try (
-                    PreparedStatement statement =
-                            connection.prepareStatement(sql)
-            ) {
+            int hour =
+                    Integer.parseInt(
+                            kpi.getHour().substring(0, 2)
+                    );
 
-                statement.setString(
-                        1,
-                        kpi.getDate()
-                );
+            statement.setInt(
+                    2,
+                    hour
+            );
 
-                int hour =
-                        Integer.parseInt(
-                                kpi.getHour().substring(0, 2)
-                        );
+            statement.setInt(
+                    3,
+                    kpi.getMailRelayed()
+            );
 
-                statement.setInt(2, hour);
-                statement.setInt(
-                        3,
-                        kpi.getMailRelayed()
-                );
-                statement.setInt(
-                        4,
-                        kpi.getSpam()
-                );
-                statement.setInt(
-                        5,
-                        kpi.getVirus()
-                );
+            statement.setInt(
+                    4,
+                    kpi.getSpam()
+            );
 
-                statement.executeUpdate();
-            }
+            statement.setInt(
+                    5,
+                    kpi.getVirus()
+            );
+
+            statement.executeUpdate();
 
         } catch (SQLException e) {
 
             System.out.println(
-                    "Erreur save KPI : "
-                            + e.getMessage()
+                    "Erreur save KPI : " +
+                            e.getMessage()
             );
         }
     }
@@ -225,54 +216,61 @@ public class DatabaseManager {
                         "AND heure BETWEEN ? AND ? " +
                         "ORDER BY heure";
 
+        Connection connection =
+                getConnection();
+
+        if (connection == null) {
+            return result;
+        }
+
         try (
-                Connection connection = getConnection()
+                connection;
+                PreparedStatement statement =
+                        connection.prepareStatement(sql)
         ) {
 
-            if (connection == null) {
-                return result;
-            }
+            statement.setString(
+                    1,
+                    date
+            );
 
-            try (
-                    PreparedStatement statement =
-                            connection.prepareStatement(sql)
-            ) {
+            statement.setInt(
+                    2,
+                    startHour
+            );
 
-                statement.setString(1, date);
-                statement.setInt(2, startHour);
-                statement.setInt(3, endHour);
+            statement.setInt(
+                    3,
+                    endHour
+            );
 
-                try (
-                        ResultSet rs =
-                                statement.executeQuery()
-                ) {
+            ResultSet rs =
+                    statement.executeQuery();
 
-                    while (rs.next()) {
+            while (rs.next()) {
 
-                        String hour =
-                                String.format(
-                                        "%02d:00",
-                                        rs.getInt("heure")
-                                );
-
-                        result.add(
-                                new KPI(
-                                        rs.getString("date_kpi"),
-                                        hour,
-                                        rs.getInt("mail_relayed"),
-                                        rs.getInt("spam"),
-                                        rs.getInt("virus")
-                                )
+                String hour =
+                        String.format(
+                                "%02d:00",
+                                rs.getInt("heure")
                         );
-                    }
-                }
+
+                result.add(
+                        new KPI(
+                                rs.getString("date_kpi"),
+                                hour,
+                                rs.getInt("mail_relayed"),
+                                rs.getInt("spam"),
+                                rs.getInt("virus")
+                        )
+                );
             }
 
         } catch (SQLException e) {
 
             System.out.println(
-                    "Erreur lecture heures : "
-                            + e.getMessage()
+                    "Erreur lecture heures : " +
+                            e.getMessage()
             );
         }
 
@@ -303,53 +301,56 @@ public class DatabaseManager {
                         "WHERE date_kpi BETWEEN ? AND ? " +
                         "ORDER BY date_kpi, heure";
 
+        Connection connection =
+                getConnection();
+
+        if (connection == null) {
+            return result;
+        }
+
         try (
-                Connection connection = getConnection()
+                connection;
+                PreparedStatement statement =
+                        connection.prepareStatement(sql)
         ) {
 
-            if (connection == null) {
-                return result;
-            }
+            statement.setString(
+                    1,
+                    startDate
+            );
 
-            try (
-                    PreparedStatement statement =
-                            connection.prepareStatement(sql)
-            ) {
+            statement.setString(
+                    2,
+                    endDate
+            );
 
-                statement.setString(1, startDate);
-                statement.setString(2, endDate);
+            ResultSet rs =
+                    statement.executeQuery();
 
-                try (
-                        ResultSet rs =
-                                statement.executeQuery()
-                ) {
+            while (rs.next()) {
 
-                    while (rs.next()) {
-
-                        String hour =
-                                String.format(
-                                        "%02d:00",
-                                        rs.getInt("heure")
-                                );
-
-                        result.add(
-                                new KPI(
-                                        rs.getString("date_kpi"),
-                                        hour,
-                                        rs.getInt("mail_relayed"),
-                                        rs.getInt("spam"),
-                                        rs.getInt("virus")
-                                )
+                String hour =
+                        String.format(
+                                "%02d:00",
+                                rs.getInt("heure")
                         );
-                    }
-                }
+
+                result.add(
+                        new KPI(
+                                rs.getString("date_kpi"),
+                                hour,
+                                rs.getInt("mail_relayed"),
+                                rs.getInt("spam"),
+                                rs.getInt("virus")
+                        )
+                );
             }
 
         } catch (SQLException e) {
 
             System.out.println(
-                    "Erreur lecture dates : "
-                            + e.getMessage()
+                    "Erreur lecture dates : " +
+                            e.getMessage()
             );
         }
 
