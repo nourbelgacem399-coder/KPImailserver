@@ -1,5 +1,4 @@
-
-        package com.kpimailserver;
+package com.kpimailserver;
 
 import java.sql.Connection;
 import java.sql.DriverManager;
@@ -7,6 +6,7 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
+import java.util.Properties;
 
 public class DatabaseManager {
 
@@ -31,16 +31,51 @@ public class DatabaseManager {
 
             if (IS_POSTGRES) {
 
-                String databaseUrl =
-                        DATABASE_URL.trim();
+                java.net.URI dbUri =
+                        new java.net.URI(DATABASE_URL.trim());
 
-                if (databaseUrl.startsWith("postgresql://")) {
-                    databaseUrl =
-                            "jdbc:" + databaseUrl;
+                String userInfo =
+                        dbUri.getUserInfo();
+
+                if (userInfo == null) {
+                    throw new SQLException(
+                            "DATABASE_URL sans user:password"
+                    );
                 }
 
+                String[] userPass =
+                        userInfo.split(":", 2);
+
+                String username = userPass[0];
+                String password = userPass[1];
+
+                int port =
+                        dbUri.getPort() == -1
+                                ? 5432
+                                : dbUri.getPort();
+
+                String jdbcUrl =
+                        "jdbc:postgresql://" +
+                                dbUri.getHost() + ":" + port +
+                                dbUri.getPath() +
+                                "?sslmode=require";
+
+                Properties properties =
+                        new Properties();
+
+                properties.setProperty(
+                        "user",
+                        username
+                );
+
+                properties.setProperty(
+                        "password",
+                        password
+                );
+
                 return DriverManager.getConnection(
-                        databaseUrl
+                        jdbcUrl,
+                        properties
                 );
             }
 
@@ -50,7 +85,7 @@ public class DatabaseManager {
                     MYSQL_PASSWORD
             );
 
-        } catch (SQLException e) {
+        } catch (Exception e) {
 
             System.out.println(
                     "Erreur connexion DB : " +
