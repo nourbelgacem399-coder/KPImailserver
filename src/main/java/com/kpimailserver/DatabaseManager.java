@@ -207,9 +207,9 @@ public class DatabaseManager {
                         connection.prepareStatement(sql)
         ) {
 
-            statement.setString(
+            statement.setDate(
                     1,
-                    date
+                    java.sql.Date.valueOf(date)
             );
 
             statement.setInt(
@@ -292,15 +292,8 @@ public class DatabaseManager {
                         connection.prepareStatement(sql)
         ) {
 
-            statement.setString(
-                    1,
-                    startDate
-            );
-
-            statement.setString(
-                    2,
-                    endDate
-            );
+            statement.setDate(1, java.sql.Date.valueOf(startDate));
+            statement.setDate(2, java.sql.Date.valueOf(endDate));
 
             ResultSet rs =
                     statement.executeQuery();
