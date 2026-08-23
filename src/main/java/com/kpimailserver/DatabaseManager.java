@@ -9,31 +9,48 @@ import java.util.ArrayList;
 
 public class DatabaseManager {
 
-    private static final String URL =
+    private static final String DATABASE_URL =
+            System.getenv("DATABASE_URL");
+
+    private static final boolean IS_POSTGRES =
+            DATABASE_URL != null && !DATABASE_URL.isBlank();
+
+    private static final String MYSQL_URL =
             "jdbc:mysql://localhost:3306/kpi_mail";
 
-    private static final String USER =
+    private static final String MYSQL_USER =
             "kpi_user";
 
-    private static final String PASSWORD =
+    private static final String MYSQL_PASSWORD =
             "kpi123";
-
-
 
     public static Connection getConnection() {
 
         try {
 
-            return DriverManager.getConnection(
-                    URL,
-                    USER,
-                    PASSWORD
-            );
+            if (IS_POSTGRES) {
+
+                String url = DATABASE_URL;
+
+                if (url.startsWith("postgresql://")) {
+                    url = "jdbc:" + url;
+                }
+
+                return DriverManager.getConnection(url);
+
+            } else {
+
+                return DriverManager.getConnection(
+                        MYSQL_URL,
+                        MYSQL_USER,
+                        MYSQL_PASSWORD
+                );
+            }
 
         } catch (SQLException e) {
 
             System.out.println(
-                    "Erreur MySQL : "
+                    "Erreur connexion DB : "
                             + e.getMessage()
             );
 
@@ -41,19 +58,33 @@ public class DatabaseManager {
         }
     }
 
-
-
-
     public static void saveKPI(KPI kpi) {
 
-        String sql =
-                "INSERT INTO kpi_hourly " +
-                        "(date_kpi, heure, mail_relayed, spam, virus) " +
-                        "VALUES (?, ?, ?, ?, ?) " +
-                        "ON DUPLICATE KEY UPDATE " +
-                        "mail_relayed = VALUES(mail_relayed), " +
-                        "spam = VALUES(spam), " +
-                        "virus = VALUES(virus)";
+        String sql;
+
+        if (IS_POSTGRES) {
+
+            sql =
+                    "INSERT INTO kpi_hourly " +
+                    "(date_kpi, heure, mail_relayed, spam, virus) " +
+                    "VALUES (?, ?, ?, ?, ?) " +
+                    "ON CONFLICT (date_kpi, heure) " +
+                    "DO UPDATE SET " +
+                    "mail_relayed = EXCLUDED.mail_relayed, " +
+                    "spam = EXCLUDED.spam, " +
+                    "virus = EXCLUDED.virus";
+
+        } else {
+
+            sql =
+                    "INSERT INTO kpi_hourly " +
+                    "(date_kpi, heure, mail_relayed, spam, virus) " +
+                    "VALUES (?, ?, ?, ?, ?) " +
+                    "ON DUPLICATE KEY UPDATE " +
+                    "mail_relayed = VALUES(mail_relayed), " +
+                    "spam = VALUES(spam), " +
+                    "virus = VALUES(virus)";
+        }
 
         try (
                 Connection connection = getConnection();
@@ -61,33 +92,21 @@ public class DatabaseManager {
                         connection.prepareStatement(sql)
         ) {
 
-            statement.setString(
-                    1,
-                    kpi.getDate()
-            );
+            if (connection == null) {
+                return;
+            }
+
+            statement.setString(1, kpi.getDate());
 
             int hour =
                     Integer.parseInt(
-                            kpi.getHour()
-                                    .substring(0, 2)
+                            kpi.getHour().substring(0, 2)
                     );
 
             statement.setInt(2, hour);
-
-            statement.setInt(
-                    3,
-                    kpi.getMailRelayed()
-            );
-
-            statement.setInt(
-                    4,
-                    kpi.getSpam()
-            );
-
-            statement.setInt(
-                    5,
-                    kpi.getVirus()
-            );
+            statement.setInt(3, kpi.getMailRelayed());
+            statement.setInt(4, kpi.getSpam());
+            statement.setInt(5, kpi.getVirus());
 
             statement.executeUpdate();
 
@@ -100,9 +119,6 @@ public class DatabaseManager {
         }
     }
 
-
-
-
     public static ArrayList<KPI> getKPIBetweenHours(
             String date,
             int startHour,
@@ -113,17 +129,21 @@ public class DatabaseManager {
 
         String sql =
                 "SELECT date_kpi, heure, " +
-                        "mail_relayed, spam, virus " +
-                        "FROM kpi_hourly " +
-                        "WHERE date_kpi = ? " +
-                        "AND heure BETWEEN ? AND ? " +
-                        "ORDER BY heure";
+                "mail_relayed, spam, virus " +
+                "FROM kpi_hourly " +
+                "WHERE date_kpi = ? " +
+                "AND heure BETWEEN ? AND ? " +
+                "ORDER BY heure";
 
         try (
                 Connection connection = getConnection();
                 PreparedStatement statement =
                         connection.prepareStatement(sql)
         ) {
+
+            if (connection == null) {
+                return result;
+            }
 
             statement.setString(1, date);
             statement.setInt(2, startHour);
@@ -162,9 +182,6 @@ public class DatabaseManager {
         return result;
     }
 
-
-
-
     public static ArrayList<KPI> getKPIByDate(
             String date) {
 
@@ -175,7 +192,6 @@ public class DatabaseManager {
         );
     }
 
-
     public static ArrayList<KPI> getKPIBetweenDates(
             String startDate,
             String endDate) {
@@ -185,10 +201,10 @@ public class DatabaseManager {
 
         String sql =
                 "SELECT date_kpi, heure, " +
-                        "mail_relayed, spam, virus " +
-                        "FROM kpi_hourly " +
-                        "WHERE date_kpi BETWEEN ? AND ? " +
-                        "ORDER BY date_kpi, heure";
+                "mail_relayed, spam, virus " +
+                "FROM kpi_hourly " +
+                "WHERE date_kpi BETWEEN ? AND ? " +
+                "ORDER BY date_kpi, heure";
 
         try (
                 Connection connection = getConnection();
@@ -196,15 +212,12 @@ public class DatabaseManager {
                         connection.prepareStatement(sql)
         ) {
 
-            statement.setString(
-                    1,
-                    startDate
-            );
+            if (connection == null) {
+                return result;
+            }
 
-            statement.setString(
-                    2,
-                    endDate
-            );
+            statement.setString(1, startDate);
+            statement.setString(2, endDate);
 
             ResultSet rs =
                     statement.executeQuery();
