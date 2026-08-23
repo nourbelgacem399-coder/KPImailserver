@@ -113,11 +113,12 @@ static {
 
         } catch (SQLException e) {
 
-            System.out.println(
-                    "Erreur save KPI : "
-                            + e.getMessage()
-            );
-        }
+    throw new RuntimeException(
+            "Erreur lecture heures : "
+                    + e.getMessage(),
+            e
+    );
+}
     }
 
     public static ArrayList<KPI> getKPIBetweenHours(
