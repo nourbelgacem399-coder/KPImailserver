@@ -1,5 +1,5 @@
 
-package com.kpimailserver;
+        package com.kpimailserver;
 
 import java.sql.Connection;
 import java.sql.DriverManager;
@@ -7,7 +7,6 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
-import java.util.Properties;
 
 public class DatabaseManager {
 
@@ -32,72 +31,16 @@ public class DatabaseManager {
 
             if (IS_POSTGRES) {
 
-                String databaseUrl = DATABASE_URL.trim();
+                String databaseUrl =
+                        DATABASE_URL.trim();
 
                 if (databaseUrl.startsWith("postgresql://")) {
                     databaseUrl =
-                            databaseUrl.substring(
-                                    "postgresql://".length()
-                            );
+                            "jdbc:" + databaseUrl;
                 }
-
-                int atIndex =
-                        databaseUrl.indexOf('@');
-
-                int colonIndex =
-                        databaseUrl.indexOf(':');
-
-                if (atIndex == -1 ||
-                        colonIndex == -1 ||
-                        colonIndex > atIndex) {
-
-                    throw new SQLException(
-                            "DATABASE_URL PostgreSQL invalide"
-                    );
-                }
-
-                String username =
-                        databaseUrl.substring(
-                                0,
-                                colonIndex
-                        );
-
-                String password =
-                        databaseUrl.substring(
-                                colonIndex + 1,
-                                atIndex
-                        );
-
-                String hostAndDatabase =
-                        databaseUrl.substring(
-                                atIndex + 1
-                        );
-
-                String jdbcUrl =
-                        "jdbc:postgresql://" +
-                                hostAndDatabase;
-
-                Properties properties =
-                        new Properties();
-
-                properties.setProperty(
-                        "user",
-                        username
-                );
-
-                properties.setProperty(
-                        "password",
-                        password
-                );
-
-                properties.setProperty(
-                        "sslmode",
-                        "require"
-                );
 
                 return DriverManager.getConnection(
-                        jdbcUrl,
-                        properties
+                        databaseUrl
                 );
             }
 
