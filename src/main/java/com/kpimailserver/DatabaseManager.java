@@ -13,14 +13,7 @@ public class DatabaseManager {
             System.getenv("DATABASE_URL");
 
     private static final boolean IS_POSTGRES =
-        DATABASE_URL != null && !DATABASE_URL.isBlank();
-
-static {
-    System.out.println(
-            "DATABASE MODE = " +
-            (IS_POSTGRES ? "POSTGRESQL" : "MYSQL")
-    );
-}
+            DATABASE_URL != null && !DATABASE_URL.isBlank();
 
     private static final String MYSQL_URL =
             "jdbc:mysql://localhost:3306/kpi_mail";
@@ -30,6 +23,13 @@ static {
 
     private static final String MYSQL_PASSWORD =
             "kpi123";
+
+    static {
+        System.out.println(
+                "DATABASE MODE = " +
+                (IS_POSTGRES ? "POSTGRESQL" : "MYSQL")
+        );
+    }
 
     public static Connection getConnection() throws SQLException {
 
@@ -47,13 +47,18 @@ static {
                         : "?sslmode=require";
             }
 
-            System.out.println("Connexion PostgreSQL...");
+            System.out.println("Connecting to PostgreSQL");
 
-            return DriverManager.getConnection(url);
+            Connection connection =
+                    DriverManager.getConnection(url);
+
+            System.out.println("PostgreSQL connection OK");
+
+            return connection;
 
         } else {
 
-            System.out.println("Connexion MySQL...");
+            System.out.println("Connecting to MySQL");
 
             return DriverManager.getConnection(
                     MYSQL_URL,
@@ -97,7 +102,10 @@ static {
                         connection.prepareStatement(sql)
         ) {
 
-            statement.setString(1, kpi.getDate());
+            statement.setString(
+                    1,
+                    kpi.getDate()
+            );
 
             int hour =
                     Integer.parseInt(
@@ -105,20 +113,31 @@ static {
                     );
 
             statement.setInt(2, hour);
-            statement.setInt(3, kpi.getMailRelayed());
-            statement.setInt(4, kpi.getSpam());
-            statement.setInt(5, kpi.getVirus());
+
+            statement.setInt(
+                    3,
+                    kpi.getMailRelayed()
+            );
+
+            statement.setInt(
+                    4,
+                    kpi.getSpam()
+            );
+
+            statement.setInt(
+                    5,
+                    kpi.getVirus()
+            );
 
             statement.executeUpdate();
 
         } catch (SQLException e) {
 
-    throw new RuntimeException(
-            "Erreur lecture heures : "
-                    + e.getMessage(),
-            e
-    );
-}
+            System.out.println(
+                    "Erreur save KPI : "
+                            + e.getMessage()
+            );
+        }
     }
 
     public static ArrayList<KPI> getKPIBetweenHours(
@@ -139,15 +158,30 @@ static {
 
         try (Connection connection = getConnection()) {
 
-            try (PreparedStatement statement =
-                         connection.prepareStatement(sql)) {
+            try (
+                    PreparedStatement statement =
+                            connection.prepareStatement(sql)
+            ) {
 
-                statement.setString(1, date);
-                statement.setInt(2, startHour);
-                statement.setInt(3, endHour);
+                statement.setString(
+                        1,
+                        date
+                );
 
-                try (ResultSet rs =
-                             statement.executeQuery()) {
+                statement.setInt(
+                        2,
+                        startHour
+                );
+
+                statement.setInt(
+                        3,
+                        endHour
+                );
+
+                try (
+                        ResultSet rs =
+                                statement.executeQuery()
+                ) {
 
                     while (rs.next()) {
 
@@ -175,6 +209,12 @@ static {
             System.out.println(
                     "Erreur lecture heures : "
                             + e.getMessage()
+            );
+
+            throw new RuntimeException(
+                    "Erreur lecture heures : "
+                            + e.getMessage(),
+                    e
             );
         }
 
@@ -207,14 +247,25 @@ static {
 
         try (Connection connection = getConnection()) {
 
-            try (PreparedStatement statement =
-                         connection.prepareStatement(sql)) {
+            try (
+                    PreparedStatement statement =
+                            connection.prepareStatement(sql)
+            ) {
 
-                statement.setString(1, startDate);
-                statement.setString(2, endDate);
+                statement.setString(
+                        1,
+                        startDate
+                );
 
-                try (ResultSet rs =
-                             statement.executeQuery()) {
+                statement.setString(
+                        2,
+                        endDate
+                );
+
+                try (
+                        ResultSet rs =
+                                statement.executeQuery()
+                ) {
 
                     while (rs.next()) {
 
@@ -242,6 +293,12 @@ static {
             System.out.println(
                     "Erreur lecture dates : "
                             + e.getMessage()
+            );
+
+            throw new RuntimeException(
+                    "Erreur lecture dates : "
+                            + e.getMessage(),
+                    e
             );
         }
 
