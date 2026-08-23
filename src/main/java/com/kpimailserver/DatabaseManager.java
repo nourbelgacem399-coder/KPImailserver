@@ -24,37 +24,35 @@ public class DatabaseManager {
     private static final String MYSQL_PASSWORD =
             "kpi123";
 
-    public static Connection getConnection() {
+    public static Connection getConnection() throws SQLException {
 
-        try {
+        if (IS_POSTGRES) {
 
-            if (IS_POSTGRES) {
+            String url = DATABASE_URL;
 
-                String url = DATABASE_URL;
-
-                if (url.startsWith("postgresql://")) {
-                    url = "jdbc:" + url;
-                }
-
-                return DriverManager.getConnection(url);
-
-            } else {
-
-                return DriverManager.getConnection(
-                        MYSQL_URL,
-                        MYSQL_USER,
-                        MYSQL_PASSWORD
-                );
+            if (url.startsWith("postgresql://")) {
+                url = "jdbc:" + url;
             }
 
-        } catch (SQLException e) {
+            if (!url.contains("sslmode=")) {
+                url += url.contains("?")
+                        ? "&sslmode=require"
+                        : "?sslmode=require";
+            }
 
-            System.out.println(
-                    "Erreur connexion DB : "
-                            + e.getMessage()
+            System.out.println("Connexion PostgreSQL...");
+
+            return DriverManager.getConnection(url);
+
+        } else {
+
+            System.out.println("Connexion MySQL...");
+
+            return DriverManager.getConnection(
+                    MYSQL_URL,
+                    MYSQL_USER,
+                    MYSQL_PASSWORD
             );
-
-            return null;
         }
     }
 
@@ -91,10 +89,6 @@ public class DatabaseManager {
                 PreparedStatement statement =
                         connection.prepareStatement(sql)
         ) {
-
-            if (connection == null) {
-                return;
-            }
 
             statement.setString(1, kpi.getDate());
 
@@ -135,40 +129,37 @@ public class DatabaseManager {
                 "AND heure BETWEEN ? AND ? " +
                 "ORDER BY heure";
 
-        try (
-                Connection connection = getConnection();
-                PreparedStatement statement =
-                        connection.prepareStatement(sql)
-        ) {
+        try (Connection connection = getConnection()) {
 
-            if (connection == null) {
-                return result;
-            }
+            try (PreparedStatement statement =
+                         connection.prepareStatement(sql)) {
 
-            statement.setString(1, date);
-            statement.setInt(2, startHour);
-            statement.setInt(3, endHour);
+                statement.setString(1, date);
+                statement.setInt(2, startHour);
+                statement.setInt(3, endHour);
 
-            ResultSet rs =
-                    statement.executeQuery();
+                try (ResultSet rs =
+                             statement.executeQuery()) {
 
-            while (rs.next()) {
+                    while (rs.next()) {
 
-                String hour =
-                        String.format(
-                                "%02d:00",
-                                rs.getInt("heure")
+                        String hour =
+                                String.format(
+                                        "%02d:00",
+                                        rs.getInt("heure")
+                                );
+
+                        result.add(
+                                new KPI(
+                                        rs.getString("date_kpi"),
+                                        hour,
+                                        rs.getInt("mail_relayed"),
+                                        rs.getInt("spam"),
+                                        rs.getInt("virus")
+                                )
                         );
-
-                result.add(
-                        new KPI(
-                                rs.getString("date_kpi"),
-                                hour,
-                                rs.getInt("mail_relayed"),
-                                rs.getInt("spam"),
-                                rs.getInt("virus")
-                        )
-                );
+                    }
+                }
             }
 
         } catch (SQLException e) {
@@ -206,39 +197,36 @@ public class DatabaseManager {
                 "WHERE date_kpi BETWEEN ? AND ? " +
                 "ORDER BY date_kpi, heure";
 
-        try (
-                Connection connection = getConnection();
-                PreparedStatement statement =
-                        connection.prepareStatement(sql)
-        ) {
+        try (Connection connection = getConnection()) {
 
-            if (connection == null) {
-                return result;
-            }
+            try (PreparedStatement statement =
+                         connection.prepareStatement(sql)) {
 
-            statement.setString(1, startDate);
-            statement.setString(2, endDate);
+                statement.setString(1, startDate);
+                statement.setString(2, endDate);
 
-            ResultSet rs =
-                    statement.executeQuery();
+                try (ResultSet rs =
+                             statement.executeQuery()) {
 
-            while (rs.next()) {
+                    while (rs.next()) {
 
-                String hour =
-                        String.format(
-                                "%02d:00",
-                                rs.getInt("heure")
+                        String hour =
+                                String.format(
+                                        "%02d:00",
+                                        rs.getInt("heure")
+                                );
+
+                        result.add(
+                                new KPI(
+                                        rs.getString("date_kpi"),
+                                        hour,
+                                        rs.getInt("mail_relayed"),
+                                        rs.getInt("spam"),
+                                        rs.getInt("virus")
+                                )
                         );
-
-                result.add(
-                        new KPI(
-                                rs.getString("date_kpi"),
-                                hour,
-                                rs.getInt("mail_relayed"),
-                                rs.getInt("spam"),
-                                rs.getInt("virus")
-                        )
-                );
+                    }
+                }
             }
 
         } catch (SQLException e) {
