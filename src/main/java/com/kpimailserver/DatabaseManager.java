@@ -1,5 +1,8 @@
 package com.kpimailserver;
 
+import java.net.URI;
+import java.net.URLDecoder;
+import java.nio.charset.StandardCharsets;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
@@ -24,41 +27,92 @@ public class DatabaseManager {
     private static final String MYSQL_PASSWORD =
             "kpi123";
 
-    static {
-        System.out.println(
-                "DATABASE MODE = " +
-                (IS_POSTGRES ? "POSTGRESQL" : "MYSQL")
-        );
-    }
-
     public static Connection getConnection() throws SQLException {
 
         if (IS_POSTGRES) {
 
-            String url = DATABASE_URL;
+            try {
 
-            if (url.startsWith("postgresql://")) {
-                url = "jdbc:" + url;
+                URI uri = new URI(DATABASE_URL);
+
+                String host = uri.getHost();
+
+                int port = uri.getPort();
+
+                if (port == -1) {
+                    port = 5432;
+                }
+
+                String database =
+                        uri.getPath().substring(1);
+
+                String userInfo =
+                        uri.getUserInfo();
+
+                String username =
+                        URLDecoder.decode(
+                                userInfo.substring(
+                                        0,
+                                        userInfo.indexOf(':')
+                                ),
+                                StandardCharsets.UTF_8
+                        );
+
+                String password =
+                        URLDecoder.decode(
+                                userInfo.substring(
+                                        userInfo.indexOf(':') + 1
+                                ),
+                                StandardCharsets.UTF_8
+                        );
+
+                String jdbcUrl =
+                        "jdbc:postgresql://"
+                                + host
+                                + ":"
+                                + port
+                                + "/"
+                                + database
+                                + "?sslmode=require";
+
+                System.out.println(
+                        "Connexion PostgreSQL vers : "
+                                + host
+                                + ":"
+                                + port
+                );
+
+                Connection connection =
+                        DriverManager.getConnection(
+                                jdbcUrl,
+                                username,
+                                password
+                        );
+
+                System.out.println(
+                        "PostgreSQL connection OK"
+                );
+
+                return connection;
+
+            } catch (Exception e) {
+
+                System.out.println(
+                        "Erreur connexion PostgreSQL : "
+                                + e.getMessage()
+                );
+
+                throw new SQLException(
+                        "Impossible de se connecter à PostgreSQL",
+                        e
+                );
             }
-
-            if (!url.contains("sslmode=")) {
-                url += url.contains("?")
-                        ? "&sslmode=require"
-                        : "?sslmode=require";
-            }
-
-            System.out.println("Connecting to PostgreSQL");
-
-            Connection connection =
-                    DriverManager.getConnection(url);
-
-            System.out.println("PostgreSQL connection OK");
-
-            return connection;
 
         } else {
 
-            System.out.println("Connecting to MySQL");
+            System.out.println(
+                    "Connexion MySQL"
+            );
 
             return DriverManager.getConnection(
                     MYSQL_URL,
@@ -113,17 +167,14 @@ public class DatabaseManager {
                     );
 
             statement.setInt(2, hour);
-
             statement.setInt(
                     3,
                     kpi.getMailRelayed()
             );
-
             statement.setInt(
                     4,
                     kpi.getSpam()
             );
-
             statement.setInt(
                     5,
                     kpi.getVirus()
@@ -156,52 +207,37 @@ public class DatabaseManager {
                 "AND heure BETWEEN ? AND ? " +
                 "ORDER BY heure";
 
-        try (Connection connection = getConnection()) {
+        try (
+                Connection connection =
+                        getConnection();
+                PreparedStatement statement =
+                        connection.prepareStatement(sql)
+        ) {
 
-            try (
-                    PreparedStatement statement =
-                            connection.prepareStatement(sql)
-            ) {
+            statement.setString(1, date);
+            statement.setInt(2, startHour);
+            statement.setInt(3, endHour);
 
-                statement.setString(
-                        1,
-                        date
-                );
+            ResultSet rs =
+                    statement.executeQuery();
 
-                statement.setInt(
-                        2,
-                        startHour
-                );
+            while (rs.next()) {
 
-                statement.setInt(
-                        3,
-                        endHour
-                );
-
-                try (
-                        ResultSet rs =
-                                statement.executeQuery()
-                ) {
-
-                    while (rs.next()) {
-
-                        String hour =
-                                String.format(
-                                        "%02d:00",
-                                        rs.getInt("heure")
-                                );
-
-                        result.add(
-                                new KPI(
-                                        rs.getString("date_kpi"),
-                                        hour,
-                                        rs.getInt("mail_relayed"),
-                                        rs.getInt("spam"),
-                                        rs.getInt("virus")
-                                )
+                String hour =
+                        String.format(
+                                "%02d:00",
+                                rs.getInt("heure")
                         );
-                    }
-                }
+
+                result.add(
+                        new KPI(
+                                rs.getString("date_kpi"),
+                                hour,
+                                rs.getInt("mail_relayed"),
+                                rs.getInt("spam"),
+                                rs.getInt("virus")
+                        )
+                );
             }
 
         } catch (SQLException e) {
@@ -211,11 +247,7 @@ public class DatabaseManager {
                             + e.getMessage()
             );
 
-            throw new RuntimeException(
-                    "Erreur lecture heures : "
-                            + e.getMessage(),
-                    e
-            );
+            throw new RuntimeException(e);
         }
 
         return result;
@@ -245,47 +277,43 @@ public class DatabaseManager {
                 "WHERE date_kpi BETWEEN ? AND ? " +
                 "ORDER BY date_kpi, heure";
 
-        try (Connection connection = getConnection()) {
+        try (
+                Connection connection =
+                        getConnection();
+                PreparedStatement statement =
+                        connection.prepareStatement(sql)
+        ) {
 
-            try (
-                    PreparedStatement statement =
-                            connection.prepareStatement(sql)
-            ) {
+            statement.setString(
+                    1,
+                    startDate
+            );
 
-                statement.setString(
-                        1,
-                        startDate
-                );
+            statement.setString(
+                    2,
+                    endDate
+            );
 
-                statement.setString(
-                        2,
-                        endDate
-                );
+            ResultSet rs =
+                    statement.executeQuery();
 
-                try (
-                        ResultSet rs =
-                                statement.executeQuery()
-                ) {
+            while (rs.next()) {
 
-                    while (rs.next()) {
-
-                        String hour =
-                                String.format(
-                                        "%02d:00",
-                                        rs.getInt("heure")
-                                );
-
-                        result.add(
-                                new KPI(
-                                        rs.getString("date_kpi"),
-                                        hour,
-                                        rs.getInt("mail_relayed"),
-                                        rs.getInt("spam"),
-                                        rs.getInt("virus")
-                                )
+                String hour =
+                        String.format(
+                                "%02d:00",
+                                rs.getInt("heure")
                         );
-                    }
-                }
+
+                result.add(
+                        new KPI(
+                                rs.getString("date_kpi"),
+                                hour,
+                                rs.getInt("mail_relayed"),
+                                rs.getInt("spam"),
+                                rs.getInt("virus")
+                        )
+                );
             }
 
         } catch (SQLException e) {
@@ -295,11 +323,7 @@ public class DatabaseManager {
                             + e.getMessage()
             );
 
-            throw new RuntimeException(
-                    "Erreur lecture dates : "
-                            + e.getMessage(),
-                    e
-            );
+            throw new RuntimeException(e);
         }
 
         return result;
